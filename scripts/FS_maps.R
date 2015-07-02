@@ -2,12 +2,16 @@ library(rgdal)
 library(zoom)
 library(maps)
 
+subset(ogrDrivers(), grepl("GDB", name))
 ogrListLayers("./S_USA.Activity_HazFuelTrt_PL.gdb")
 fuel = readOGR("./S_USA.Activity_HazFuelTrt_PL.gdb",
                layer="Activity_HazFuelTrt_PL")
+fuel_cp = crop(fuel, extent(-80, -79.2, 32.5, 33.5))
+save(fuel_cp, file='fuel_cp.Rdata')
 
-ex= -79.7 to -80.05
-32.5 to 33.5
+
+burn = readOGR('./FM_RxBurnHistory.gdb',
+               layer='FM_RxBurnHistory')
 
 Stand = readOGR('./Stand.shp', layer='Stand')
 Owners = readOGR('./BasicSurfaceOwnership.shp', layer='BasicSurfaceOwnership')
