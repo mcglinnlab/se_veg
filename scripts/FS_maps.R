@@ -5,22 +5,22 @@ library(maps)
 tst = readOGR('./S_USA.Activity_HazFuelTrt_LN.shp', 
               layer='S_USA.Activity_HazFuelTrt_LN')
 
-ogrListLayers("./sef_lidar.gdb/gdb")
+ogrListLayers("./gis/sef_lidar.gdb/gdb")
 
-topo = readOGR('./Topography.shp', layer='Topography')
-soil = readOGR('./SSURGO_Soils.shp', layer='SSURGO_Soils')    
+topo = readOGR('./gis/Topography.shp', layer='Topography')
+soil = readOGR('./gis/SSURGO_Soils.shp', layer='SSURGO_Soils')    
 
-Stand = readOGR('./Stand.shp', layer='Stand')
-Owners = readOGR('./BasicSurfaceOwnership.shp', layer='BasicSurfaceOwnership')
+Stand = readOGR('./gis/Stand.shp', layer='Stand')
+Owners = readOGR('./gis/BasicSurfaceOwnership.shp', layer='BasicSurfaceOwnership')
 
-invasive = readOGR('./Current_Invasive_Plants_Inventory.shp', 
+invasive = readOGR('./gis/Current_Invasive_Plants_Inventory.shp', 
                    layer='Current_Invasive_Plants_Inventory')
 
-fire_occ = readOGR('./Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations.shp', 
+fire_occ = readOGR('./gis/Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations.shp', 
                    layer='Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations')
-fire_poly = readOGR('./Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
+fire_poly = readOGR('./gis/Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
                     layer='Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries')
-fire_Rx = readOGR('./FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
+fire_Rx = readOGR('./gis/FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
 
 par(mfrow=c(1,2))
 plot(fire_poly)
@@ -41,7 +41,7 @@ Owners_ll = spTransform(Owners, geo_prj)
 topo_ll = spTransform(topo, geo_prj)
 soil_ll = spTransform(soil, geo_prj)
 
-vegplots = read.csv('./CharlestonPlots.csv')
+vegplots = read.csv('./data/CharlestonPlots.csv')
 head(vegplots)
 vegplots = SpatialPointsDataFrame(coords = vegplots[ , c('Real.Longitude', 'Real.Latitude')],
                                   data=vegplots, coords.nrs = 5:6,
@@ -67,13 +67,13 @@ legend('bottomright', c('longleaf plot', 'other plot'),
 dev.off()
 
 ## export kmls
-writeOGR(Stand_ll, "Stand.kml", "Stand", "KML")
-writeOGR(llStand_ll, "llStand.kml", "Stand", "KML")
-writeOGR(Owners_ll, "Owners.kml", "Owners", "KML")
-writeOGR(topo_ll, "topo.kml", "topo", "KML")
-writeOGR(soil_ll, "soil.kml", "soil", "KML")
-writeOGR(vegplots, "vegplots.kml", "vegplots", "KML")
-writeOGR(llvegplots, "llvegplots.kml", "llvegplots", "KML")
+writeOGR(Stand_ll, "./gis/Stand.kml", "Stand", "KML")
+writeOGR(llStand_ll, "./gis/llStand.kml", "Stand", "KML")
+writeOGR(Owners_ll, "./gis/Owners.kml", "Owners", "KML")
+writeOGR(topo_ll, "./gis/topo.kml", "topo", "KML")
+writeOGR(soil_ll, "./gis/soil.kml", "soil", "KML")
+writeOGR(vegplots, "./gis/vegplots.kml", "vegplots", "KML")
+writeOGR(llvegplots, "./gis/llvegplots.kml", "llvegplots", "KML")
 
 ## summary
 
