@@ -118,7 +118,22 @@ DownloadFireDat.s <- function(ftpsite, Downloaddir, whatwins = "all",
 source("./scripts/read_config.R") # need MODIS_downloaddir
 
 # download the fire data from the MODIS ftp site
-DownloadFireDat.s(ftpsite, MODIS_downloaddir, whatwins = 3, whatyears = "getyears")
+DownloadFireDat.s(ftpsite, MODIS_downloaddir, whatwins = "03", whatyears = "getyears")
 
 # extract compressed files using bash:
 system(paste("find", MODIS_downloaddir , "-name '*.gz' -exec gunzip '{}' \\;"))
+
+# check that all files were downloaded:
+#files = list()
+#window = '03'
+#win <- paste("Win", window, sep = "")
+#years = 2000:2015
+#for(j in 10:12){
+#      ### test this for just one folder
+#      inputURL <- paste(ftpsite, win, "/", years[j], "/", sep = "")
+#        filenames <- try(getURL(inputURL, ftp.use.epsv = FALSE, dirlistonly = TRUE))
+#        #filenames <- getURL(inputURL, ftp.use.epsv = FALSE, dirlistonly = TRUE)
+#        Sys.sleep(4)
+#      files[[j]] <- strsplit(filenames, "\r*\n")[[1]]
+#      files[[j]] <- files[[j]][grep("burndate", files[[j]])]
+#}
