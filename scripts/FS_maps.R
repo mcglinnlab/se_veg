@@ -1,25 +1,28 @@
+library(raster)
 library(rgdal)
 library(zoom)
 library(maps)
+library(readxl)
 
 source('./scripts/functions.R')
 
-topo = readOGR('./gis/Topography.shp', layer='Topography')
-soil = readOGR('./gis/SSURGO_Soils.shp', layer='SSURGO_Soils')    
+topo = readOGR('./gis/poly/Topography.shp', layer='Topography')
+soil = readOGR('./gis/poly/SSURGO_Soils.shp', layer='SSURGO_Soils')    
 
-Stand = readOGR('./gis/Stand.shp', layer='Stand')
-Owners = readOGR('./gis/BasicSurfaceOwnership.shp', layer='BasicSurfaceOwnership')
-
-invasive = readOGR('./gis/Current_Invasive_Plants_Inventory.shp', 
+Stand = readOGR('./gis/poly/Stand.shp', layer='Stand')
+Owners = readOGR('./gis/poly/BasicSurfaceOwnership.shp', layer='BasicSurfaceOwnership')
+roads = readOGR('./gis/poly/Road.shp', layer='Road')
+invasive = readOGR('./gis/poly/Current_Invasive_Plants_Inventory.shp', 
                    layer='Current_Invasive_Plants_Inventory')
 
-tst = readOGR('./gis/MCD45monthly.A2000092.Win03.051.burndate.shp', 
-              'MCD45monthly.A2000092.Win03.051.burndate')
-fire_occ = readOGR('./gis/Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations.shp', 
+topo = stack('./gis/raster/1944 Cordesville Topographic Map.img')
+
+fire_modis = raster('./gis/ModisData/nburns.grd')
+fire_occ = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations.shp', 
                    layer='Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations')
-fire_poly = readOGR('./gis/Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
+fire_poly = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
                     layer='Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries')
-fire_Rx = readOGR('./gis/FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
+fire_Rx = readOGR('./gis/poly/FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
 # drop burns without a date
 fire_Rx = fire_Rx[!is.na(fire_Rx$BurnDat), ]
 fire_Rx$BurnDat = as.Date(fire_Rx$BurnDat, "%Y/%m/%d %H:%M:%S")
@@ -46,11 +49,38 @@ llStand_ll = spTransform(llStand, geo_prj)
 Owners_ll = spTransform(Owners, geo_prj)
 topo_ll = spTransform(topo, geo_prj)
 soil_ll = spTransform(soil, geo_prj)
+fire_Rx_ll = spTransform(fire_Rx, geo_prj)
+
+
+plots16sp = read_excel('./data/Project016.xlsx', sheet = 'plot species list')
+sr = with(plots16sp, tapply(currentTaxonName, authorObsCode, function(x) length(unique(x))))
+plot(density(sr))
+hist(sr)
+
+plots16 = read_excel('./data/Project016.xlsx', sheet = 'plot data')
+plots16$sr = as.numeric(sr[match(plots16$`Author Observation Code`, names(sr))])
+crds16 = as.matrix(plots16[ , c('Real Longitude', 'Real Latitude')])
+
+plots16 = SpatialPointsDataFrame(coords = crds16, data=as.data.frame(plots16),
+                                  coords.nrs = c(11,12),
+                                  proj4string =  CRS("+proj=longlat +datum=WGS84"))
+
 
 vegplots = read.csv('./data/CharlestonPlots.csv')
+# fix erroneous coordinates
+c_coords = read.csv('./data/CharlestonPlots_corrected_coords.csv')
+c_coords = SpatialPointsDataFrame(coords=c_coords[ , 2:3], c_coords,
+                         proj4string = CRS('+proj=utm +zone=17 +datum=NAD83 +ellps=GRS80 +units=m +no_defs'))
+c_coords = spTransform(c_coords,  CRS("+proj=longlat +datum=WGS84"))
+vegplots[match(c_coords@data$Plot.Code, vegplots$Plot.Code), 
+         c("Real.Longitude", "Real.Latitude")] = coordinates(c_coords)
+
+
 head(vegplots)
 vegplots$project_num = as.integer(sapply(strsplit(as.character(vegplots$Plot.Code), "-"),
                                          function(x) x[1]))
+vegplots$team_num = as.integer(sapply(strsplit(as.character(vegplots$Plot.Code), "-"),
+                                         function(x) x[2]))
 vegplots$Date = as.Date(vegplots$Date, "%d-%b-%Y")
 vegplots$year = as.numeric(format(vegplots$Date, "%Y"))
 
@@ -102,22 +132,41 @@ llvegplots$nburns = sapply(yrs_since_burn[grep('Pinus palustris',
 inbounds = ifelse(is.na(over(llvegplots, fire_Rx)[,1]), F, T)
 
 col_temp = rev(terrain.colors(5))[-1]
-par(mfrow=c(1,2))
-plot(fire_Rx, border='grey')
-points(llvegplots, pch=1)
 cols = get_samp_cols(llvegplots$ff_pre[inbounds], col_temp)
-points(llvegplots[inbounds, ], pch=19, 
-       col=get_samp_cols(llvegplots$ff_pre[inbounds], col_temp)$col)
-legend('bottomright', 
-       sort(unique(cut(llvegplots$ff_post[inbounds], length(cols))))
+grps = as.character(sort(unique(cols$grps)))
+
+pdf('./figs/pre_post_fire_freq_llvegplots.pdf', width=7*2, height=7)
 plot(fire_Rx, border='grey')
 points(llvegplots, pch=1)
-points(llvegplots[inbounds, ], pch=19, 
-       col=get_samp_cols(llvegplots$ff_post[inbounds], cols))
+points(llvegplots[inbounds, ], pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
 
-spplot(llvegplots, c("ff_pre", "ff_post"), col.regions=rev(terrain.colors(6)[-6]),
-       pch=19)
+cols = get_samp_cols(llvegplots$ff_post[inbounds], col_temp)
+grps = as.character(sort(unique(cols$grps)))
+plot(fire_Rx, border='grey')
+points(llvegplots, pch=1)
+points(llvegplots[inbounds, ], pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
+dev.off()
 
+## project 16 only
+pdf('./figs/pre_post_fire_freq_llvegplots.pdf', width=7*2, height=7)
+plot(fire_Rx, border='grey')
+points(llvegplots, pch=1)
+points(llvegplots[inbounds, ], pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
+
+cols = get_samp_cols(llvegplots$ff_post[inbounds], col_temp)
+grps = as.character(sort(unique(cols$grps)))
+plot(fire_Rx, border='grey')
+points(llvegplots, pch=1)
+points(llvegplots[inbounds, ], pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
+dev.off()
 
 table(llvegplots$year)
 
@@ -132,15 +181,34 @@ legend('bottomright', c('longleaf plot', 'other plot'),
        col=c('green3', 'dodgerblue'), pch=19, bty='n')
 dev.off()
 
-## export kmls
-writeOGR(Stand_ll, "./gis/Stand.kml", "Stand", "KML")
-writeOGR(llStand_ll, "./gis/llStand.kml", "Stand", "KML")
-writeOGR(Owners_ll, "./gis/Owners.kml", "Owners", "KML")
-writeOGR(topo_ll, "./gis/topo.kml", "topo", "KML")
-writeOGR(soil_ll, "./gis/soil.kml", "soil", "KML")
-writeOGR(vegplots, "./gis/vegplots.kml", "vegplots", "KML")
-writeOGR(llvegplots, "./gis/llvegplots.kml", "llvegplots", "KML")
+## for resampling
+llvegplots16 = llvegplots[llvegplots$project_num ==16,]
+#llvegplots16 = spTransform(llvegplots16, geo_prj)
+labs = sub('016-', '', llvegplots16@data$Plot.Code)
 
+plot(llvegplots16, col='red', pch=19, cex=.5)
+oldcrds = coordinates(llvegplots16)
+newcrds = SpatialPoints(coords = cbind(oldcrds[,1], oldcrds[,2] + 700))
+text(newcrds, labs, col='red')
+plot(roads, add=T, col='grey')
+
+## export kmls
+writeOGR(Stand_ll, "./gis/kml/Stand.kml", "Stand", "KML")
+writeOGR(llStand_ll, "./gis/kml/llStand.kml", "Stand", "KML")
+writeOGR(Owners_ll, "./gis/kml/Owners.kml", "Owners", "KML")
+writeOGR(topo_ll, "./gis/kml/topo.kml", "topo", "KML")
+writeOGR(soil_ll, "./gis/kml/soil.kml", "soil", "KML")
+vegplots = spTransform(vegplots, geo_prj)
+llvegplots = spTransform(llvegplots, geo_prj)
+writeOGR(vegplots, "./gis/kml/vegplots.kml", "vegplots", "KML")
+writeOGR(llvegplots, "./gis/kml/llvegplots.kml", "llvegplots", "KML")
+writeOGR(fire_Rx_ll, "./gis/kml/fire_Rx.kml", "fire_Rx", "KML")
+plots16_sub = plots16[ , c("Author Plot Code", "countyName", "realUTME", "realUTMN",
+                           "Author Location", "commPrimaryTranslated",
+                           "sr")]
+writeOGR(plots16_sub, "./gis/kml/plots16.kml", "plots16", "KML")
+roads = spTransform(roads, geo_prj)
+writeOGR(roads, "./gis/kml/roads.kml", "roads", "KML")
 ## summary
 
 
