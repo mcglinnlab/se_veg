@@ -35,13 +35,6 @@ par(mfrow=c(1,2))
 plot(fire_poly)
 plot(fire_Rx)
 
-
-llStand = Stand[grep('Longleaf pine', Stand@data$FORESTTYPE), ]
-
-pdf('./Stand.pdf')
-plot(Stand)
-dev.off()
-
 proj4string(Stand)
 geo_prj =  CRS("+proj=longlat +datum=WGS84")
 Stand_ll = spTransform(Stand, geo_prj)
@@ -76,7 +69,6 @@ vegplots[match(c_coords@data$Plot.Code, vegplots$Plot.Code),
          c("Real.Longitude", "Real.Latitude")] = coordinates(c_coords)
 
 
-head(vegplots)
 vegplots$project_num = as.integer(sapply(strsplit(as.character(vegplots$Plot.Code), "-"),
                                          function(x) x[1]))
 vegplots$team_num = as.integer(sapply(strsplit(as.character(vegplots$Plot.Code), "-"),
@@ -170,6 +162,26 @@ dev.off()
 
 table(llvegplots$year)
 
+## extract fire history for llvegplots
+llburn = spTransform(burn, CRS(proj4string(llvegplots)))
+vegburns = over(llvegplots, llburn, returnList=TRUE)
+
+lastburn = unlist(lapply(vegburns, function(x) as.character(max(x$BurnDate))))
+nburn = unlist(lapply(vegburns, function(x) length(x$BurnDate)))
+
+vegchar = data.frame(ID = llvegplots@data$Plot.Code, 
+                     Year = as.numeric(sapply(as.character(llvegplots@data$Date), function(x)
+                         strsplit(x, '-')[[1]][3])),
+                     Lat = llvegplots@data$Real.Latitude,
+                     Long = llvegplots@data$Real.Longitude,
+                     lastburn, nburn, 
+                     llvegplots@data$Soil.Drainage)
+
+llvegplots@data$lastburn = lastburn
+llvegplots@data$nburn = nburn
+
+
+
 pdf('vegplot_map.pdf')
 data(us.cities)
 map('county', c('south carolina,charleston', 'south carolina,berkeley'))
@@ -214,3 +226,17 @@ writeOGR(roads, "./gis/kml/roads.kml", "roads", "KML")
 
 
 
+## export kmls
+writeOGR(Stand_ll, "./gis/Stand.kml", "Stand", "KML")
+writeOGR(llStand_ll, "./gis/llStand.kml", "Stand", "KML")
+writeOGR(Owners_ll, "./gis/Owners.kml", "Owners", "KML")
+writeOGR(vegplots, "./gis/vegplots.kml", "vegplots", "KML")
+writeOGR(llvegplots, "./gis/llvegplots.kml", "llvegplots", "KML", overwrite_layer = T)
+writeOGR(llRoad, "./gis/Road.kml", "Road", "KML")
+    
+out = llvegplots
+out@data = data.frame(name=out@data$Plot.Code)
+writeOGR(out, './gis/llvegplots.gpx', 'llvegplots', 'GPX')
+
+tst = spTransform(llvegplots, CRS(proj4string(burn)))
+tst[tst@data$Plot.Code == '044-02-0602',]
