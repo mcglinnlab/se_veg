@@ -80,11 +80,12 @@ DownloadFireDat.s <- function(ftpsite, Downloaddir, whatwins = "all",
     for(j in 1:length(years)){
       ### test this for just one folder
       inputURL <- paste(ftpsite, win, "/", years[j], "/", sep = "")
-        filenames <- try(getURL(inputURL, ftp.use.epsv = FALSE, dirlistonly = TRUE))
-        #filenames <- getURL(inputURL, ftp.use.epsv = FALSE, dirlistonly = TRUE)
-        Sys.sleep(2)
+      filenames <- try(getURL(inputURL, ftp.use.epsv = FALSE, dirlistonly = TRUE))
+      #filenames <- getURL(inputURL, ftp.use.epsv = FALSE, dirlistonly = TRUE)
+      Sys.sleep(2)
       files <- strsplit(filenames, "\r*\n")[[1]]
-      files <- files[grep("burndate", files)]   # use this code if you only want to download one type of burned area data
+      # use this code if you only want to download one type of burned area data
+      files <- files[grep("burndate", files)]   
       # to make sure you dont download all over again
       currentfiles <- list.files(file.path(Downloaddir, win))
       files <- setdiff(files, currentfiles)
@@ -93,7 +94,9 @@ DownloadFireDat.s <- function(ftpsite, Downloaddir, whatwins = "all",
         which <- c(which, files)
         for(k in 1:length(filenames)){          
             try(
-                download.file(filenames[k], method = "auto", destfile = paste(Downloaddir, "/", win, "/", files[k], sep = ""))
+                download.file(filenames[k], method = "auto",
+                              destfile = paste(Downloaddir, "/", win, "/",
+                                               files[k], sep = ""))
             )
             Sys.sleep(2)
           
@@ -106,7 +109,8 @@ DownloadFireDat.s <- function(ftpsite, Downloaddir, whatwins = "all",
   ## to check whether all the data are there....
   for(i in 1:length(windows)){  
     files <- dir(paste(Downloaddir, "/", "Win", windows[i], sep = ""))
-    files <- files[grep("burndate", files)]   # use this code if you only want to download one type of burned area data
+    # use this code if you only want to download one type of burned area data
+    files <- files[grep("burndate", files)]   
     files <- gsub(".gz", "", files)
     dates <- gsub("MCD45monthly.A", "", files); dates <- substr(dates, 1, 4)
     cat("window", windows[i], "\n")
