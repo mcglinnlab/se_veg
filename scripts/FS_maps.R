@@ -23,6 +23,11 @@ fire_occ = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Fire_Occurren
 fire_poly = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
                     layer='Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries')
 fire_Rx = readOGR('./gis/poly/FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
+fire_haz = readOGR('./gis/poly/SC.Activity_HazFuelTrt_PL.shp', layer='SC.Activity_HazFuelTrt_PL')
+# crop fire_haz down to francis marion
+fire_haz = crop(fire_haz, extent(-80, -79, 32, 33.5))
+
+
 # drop burns without a date
 fire_Rx = fire_Rx[!is.na(fire_Rx$BurnDat), ]
 fire_Rx$BurnDat = as.Date(fire_Rx$BurnDat, "%Y/%m/%d %H:%M:%S")
@@ -31,9 +36,10 @@ fire_Rx$year = as.numeric(format(fire_Rx$BurnDat, "%Y"))
 
 proj4string(fire_Rx)
 
-par(mfrow=c(1,2))
+par(mfrow=c(1,3))
 plot(fire_poly)
 plot(fire_Rx)
+plot(fire_haz)
 
 proj4string(Stand)
 geo_prj =  CRS("+proj=longlat +datum=WGS84")
@@ -43,7 +49,6 @@ Owners_ll = spTransform(Owners, geo_prj)
 topo_ll = spTransform(topo, geo_prj)
 soil_ll = spTransform(soil, geo_prj)
 fire_Rx_ll = spTransform(fire_Rx, geo_prj)
-
 
 plots16sp = read_excel('./data/Project016.xlsx', sheet = 'plot species list')
 sr = with(plots16sp, tapply(currentTaxonName, authorObsCode, function(x) length(unique(x))))
