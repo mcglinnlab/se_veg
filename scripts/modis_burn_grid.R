@@ -14,10 +14,14 @@ names(fire) = as.character(dates)
 #plot(fire, 1)
 #map('state', add=T)
 
-xmin = -82
-xmax = -75
-ymin = 30
-ymax = 35
+xmin =-86.220703125
+ymin = 31.5785354265
+xmax = -75.0366210938
+ymax = 37.0551771067
+#xmin = -82
+#xmax = -75
+#ymin = 30
+#ymax = 35
 e = extent(matrix(c(xmin, ymin, xmax, ymax), 2, 2))
 
 fire_cp = crop(fire, e)
