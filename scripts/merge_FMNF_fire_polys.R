@@ -81,4 +81,4 @@ fire$date = as.Date(with(fire@data,
 # create year field
 fire$year = as.numeric(format(fire$date, "%Y"))
 
-save(fire, file='./gis/poly/fire.Rdata')
+save(fire, file='./gis/poly/FMNF_fire_poly_df.Rdata')
