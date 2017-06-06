@@ -1,5 +1,7 @@
 library(sp)
 library(rgdal)
+library(raster)
+library(rgeos)
 
 fire_poly = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
                     layer='Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries')
