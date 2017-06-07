@@ -3,20 +3,15 @@ library(rgdal)
 library(raster)
 library(rgeos)
 
-fire_poly = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
-                    layer='Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries')
 fire_Rx = readOGR('./gis/poly/FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
 #clean up subunit id field called FACTS_S
 fire_Rx$FACTS_S = as.character(fire_Rx$FACTS_S)
 true = nchar(fire_Rx$FACTS_S) > 19
 fire_Rx$FACTS_S[true] = substring(fire_Rx$FACTS_S[true], 1, 19)
-fire_haz = readOGR('./gis/poly/SC.Activity_HazFuelTrt_PL.shp', layer='SC.Activity_HazFuelTrt_PL')
+
+fire_haz = readOGR('./gis/poly/S_USA.Activity_HazFuelTrt_PL.shp', layer='S_USA.Activity_HazFuelTrt_PL')
 # crop fire_haz down to francis marion
 fire_haz = crop(fire_haz, extent(-80, -79, 32, 33.5))
-
-# S_USA.Activity_HazFuelTrt_PL is identical to SC.Activity_HazFuelTrt_PL once cropped
-#fire_haz2 = readOGR('./gis/poly/S_USA.Activity_HazFuelTrt_PL.shp', layer='S_USA.Activity_HazFuelTrt_PL')
-#fire_haz2 = crop(fire_haz, extent(-80, -79, 32, 33.5))
 
 # drop burns without a date
 fire_Rx = fire_Rx[!is.na(fire_Rx$BurnDat), ]
