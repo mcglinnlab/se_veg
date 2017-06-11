@@ -3,6 +3,7 @@ library(rgdal)
 library(zoom)
 library(maps)
 library(readxl)
+library(rgeos)
 
 source('./scripts/functions.R')
 
@@ -22,24 +23,11 @@ fire_occ = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Fire_Occurren
                    layer='Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations')
 fire_poly = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries.shp', 
                     layer='Monitoring_Trends_in_Burn_Severity__Burned_Area_Boundaries')
-fire_Rx = readOGR('./gis/poly/FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
-fire_haz = readOGR('./gis/poly/SC.Activity_HazFuelTrt_PL.shp', layer='SC.Activity_HazFuelTrt_PL')
-# crop fire_haz down to francis marion
-fire_haz = crop(fire_haz, extent(-80, -79, 32, 33.5))
-
-
-# drop burns without a date
-fire_Rx = fire_Rx[!is.na(fire_Rx$BurnDat), ]
-fire_Rx$BurnDat = as.Date(fire_Rx$BurnDat, "%Y/%m/%d %H:%M:%S")
-fire_Rx$year = as.numeric(format(fire_Rx$BurnDat, "%Y"))
-
-
-proj4string(fire_Rx)
-
-par(mfrow=c(1,3))
-plot(fire_poly)
-plot(fire_Rx)
-plot(fire_haz)
+# load merged fire polys for FMNF object is called "fire"
+load('./gis/poly/FMNF_fire_poly_df.Rdata')
+# filter down to just fires
+notfire = fire[fire@data$TREATMENT_ %in% c('Biomass Removal', 'Machine Pile', 'Thinning'), ]
+fire  = fire[!(fire@data$TREATMENT_ %in% c('Biomass Removal', 'Machine Pile', 'Thinning')), ]
 
 proj4string(Stand)
 geo_prj =  CRS("+proj=longlat +datum=WGS84")
@@ -48,7 +36,7 @@ llStand_ll = spTransform(llStand, geo_prj)
 Owners_ll = spTransform(Owners, geo_prj)
 topo_ll = spTransform(topo, geo_prj)
 soil_ll = spTransform(soil, geo_prj)
-fire_Rx_ll = spTransform(fire_Rx, geo_prj)
+fire_ll = spTransform(fire, geo_prj)
 
 plots16sp = read_excel('./data/Project016.xlsx', sheet = 'plot species list')
 sr = with(plots16sp, tapply(currentTaxonName, authorObsCode, function(x) length(unique(x))))
@@ -76,32 +64,36 @@ vegplots[match(c_coords@data$Plot.Code, vegplots$Plot.Code),
 
 vegplots$project_num = as.integer(sapply(strsplit(as.character(vegplots$Plot.Code), "-"),
                                          function(x) x[1]))
-vegplots$team_num = as.integer(sapply(strsplit(as.character(vegplots$Plot.Code), "-"),
-                                         function(x) x[2]))
+vegplots$team_num = sapply(strsplit(as.character(vegplots$Plot.Code), "-"),
+                                         function(x) x[2])
 vegplots$Date = as.Date(vegplots$Date, "%d-%b-%Y")
 vegplots$year = as.numeric(format(vegplots$Date, "%Y"))
 
 vegplots = SpatialPointsDataFrame(coords = vegplots[ , c('Real.Longitude', 'Real.Latitude')],
                                   data=vegplots, coords.nrs = 5:6,
                                   proj4string =  CRS("+proj=longlat +datum=WGS84"))
-utm_prj =  CRS(proj4string(fire_Rx))
+utm_prj =  CRS(proj4string(fire))
 vegplots = spTransform(vegplots, utm_prj)
 
-plot(fire_Rx)
+plot(fire)
 points(vegplots, col='red')
 points(vegplots[grep('Pinus palustris', vegplots$commPrimaryScientific), ],
        col='red', pch=19)
 points(vegplots[vegplots$project_num == 16, ], col='blue')
 
 
-tst = sapply(fire_Rx, function(x) over(x, vegplots))
-plt_burns = sapply(1:nrow(fire_Rx), function(x) 
-                   over(fire_Rx[x, ], vegplots)$Plot.Code)
+tst = sapply(fire, function(x) over(x, vegplots))
+plt_burns = sapply(1:nrow(vegplots), function(x)
+                   over(vegplots[x, ], fire)$)
+
+
+plt_burns = sapply(1:nrow(fire), function(x) 
+                   over(fire[x, ], vegplots)$Plot.Code)
 table(plt_burns)
 yrs_since_burn = vector('list', nrow(vegplots))
 names(yrs_since_burn) = vegplots$Plot.Code
 for(i in 1:nrow(vegplots)) {
-    burndates = fire_Rx$BurnDat[which(plt_burns == vegplots$Plot.Code[i])]
+    burndates = fire_ll$date[which(plt_burns == vegplots$Plot.Code[i])]
     yrs_since_burn[[i]] = vegplots$Date[i] - burndates  
 }
 
@@ -126,14 +118,14 @@ llvegplots$nburns = sapply(yrs_since_burn[grep('Pinus palustris',
                                                vegplots$commPrimaryScientific)],
                            length)
 
-inbounds = ifelse(is.na(over(llvegplots, fire_Rx)[,1]), F, T)
+inbounds = ifelse(is.na(over(llvegplots, fire_ll)[,1]), F, T)
 
 col_temp = rev(terrain.colors(5))[-1]
 cols = get_samp_cols(llvegplots$ff_pre[inbounds], col_temp)
 grps = as.character(sort(unique(cols$grps)))
 
 pdf('./figs/pre_post_fire_freq_llvegplots.pdf', width=7*2, height=7)
-plot(fire_Rx, border='grey')
+plot(fire_ll, border='grey')
 points(llvegplots, pch=1)
 points(llvegplots[inbounds, ], pch=19, col=cols$col)
 legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
@@ -141,7 +133,7 @@ legend('bottomright', grps, col = cols$col[match(grps, cols$grps)],
 
 cols = get_samp_cols(llvegplots$ff_post[inbounds], col_temp)
 grps = as.character(sort(unique(cols$grps)))
-plot(fire_Rx, border='grey')
+plot(fire_ll, border='grey')
 points(llvegplots, pch=1)
 points(llvegplots[inbounds, ], pch=19, col=cols$col)
 legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
@@ -149,8 +141,8 @@ legend('bottomright', grps, col = cols$col[match(grps, cols$grps)],
 dev.off()
 
 ## project 16 only
-pdf('./figs/pre_post_fire_freq_llvegplots.pdf', width=7*2, height=7)
-plot(fire_Rx, border='grey')
+pdf('./figs/pre_post_fire_freq_llvegplots_Proj16.pdf', width=7*2, height=7)
+plot(fire_ll, border='grey')
 points(llvegplots, pch=1)
 points(llvegplots[inbounds, ], pch=19, col=cols$col)
 legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
@@ -158,7 +150,7 @@ legend('bottomright', grps, col = cols$col[match(grps, cols$grps)],
 
 cols = get_samp_cols(llvegplots$ff_post[inbounds], col_temp)
 grps = as.character(sort(unique(cols$grps)))
-plot(fire_Rx, border='grey')
+plot(fire_ll, border='grey')
 points(llvegplots, pch=1)
 points(llvegplots[inbounds, ], pch=19, col=cols$col)
 legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
@@ -219,7 +211,7 @@ vegplots = spTransform(vegplots, geo_prj)
 llvegplots = spTransform(llvegplots, geo_prj)
 writeOGR(vegplots, "./gis/kml/vegplots.kml", "vegplots", "KML")
 writeOGR(llvegplots, "./gis/kml/llvegplots.kml", "llvegplots", "KML")
-writeOGR(fire_Rx_ll, "./gis/kml/fire_Rx.kml", "fire_Rx", "KML")
+writeOGR(fire_ll, "./gis/kml/fire.kml", "fire", "KML")
 plots16_sub = plots16[ , c("Author Plot Code", "countyName", "realUTME", "realUTMN",
                            "Author Location", "commPrimaryTranslated",
                            "sr")]
