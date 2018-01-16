@@ -38,6 +38,83 @@ topo_ll = spTransform(topo, geo_prj)
 soil_ll = spTransform(soil, geo_prj)
 fire_ll = spTransform(fire, geo_prj)
 
+pond = read.csv('./data/pond_treatments.csv')
+pond = SpatialPointsDataFrame(coords = pond[ , c('LONGITUDE', 'LATITUDE')],
+                              data = pond)
+proj4string(pond) = geo_prj
+
+plot(fire_ll, border='grey')
+points(pond, col='red')
+
+pond_burns = sapply(1:nrow(fire_ll), function(x) 
+                    over(fire_ll[x, ], pond)$COMPARTMEN)
+yrs_since_burn = vector('list', nrow(pond))
+names(yrs_since_burn) = pond$COMPARTMEN
+last_sample_date = as.Date('2000-06-23')
+for(i in 1:nrow(pond)) {
+    burndates = fire_ll$date[which(pond_burns == pond$COMPARTMEN[i])]
+    yrs_since_burn[[i]] = (last_sample_date - burndates) / 365
+}
+
+ff_91_00 = sapply(yrs_since_burn, function(x) sum(x > 0))
+ff_00_17 = sapply(yrs_since_burn, function(x) sum(x < 0))
+ff_last_8yr = sapply(yrs_since_burn, function(x) sum(x < -8)) 
+YSB_00 = sapply(yrs_since_burn, function(x) min(x[x > 0]))
+YSB_00[is.infinite(YSB_00)] = 10
+YSB_17 = sapply(yrs_since_burn, function(x) min(x) - 
+               (last_sample_date - as.Date('2018-01-01'))/365)
+YSB_17[is.infinite(YSB_17)] = 30
+
+pond_fire_data = data.frame(COMPARTMEN = names(ff_91_00), 
+                            ff_91_00, ff_00_17, ff_last_8yr,
+                            YSB_00, YSB_17)
+pond@data = merge(pond@data, pond_fire_data)
+write.csv(pond@data, file='./data/pond_fire_extracted.csv',
+          row.names=F)
+
+
+plot(ff_91_00, ff_last_8yr, type='n')
+abline(a=0, b=1)
+text(jitter(ff_91_00), ff_last_8yr, names(ff_91_00),
+     col=)
+identify(ff_pre, ff_post, names(ff_pre))
+
+col_temp = rev(terrain.colors(5))[-1]
+pdf('./figs/pre_post_fire_freq_pond.pdf', width=7*2, height=7)
+par(mfrow=c(1,2))
+cols = get_samp_cols(pond@data$ff_91_00, col_temp)
+grps = as.character(sort(unique(cols$grps)))
+plot(fire_ll, border='grey')
+points(pond, pch=1)
+points(pond, pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
+cols = get_samp_cols(pond@data$ff_last_8yr, col_temp)
+grps = as.character(sort(unique(cols$grps)))
+plot(fire_ll, border='grey')
+points(pond, pch=1)
+points(pond, pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
+
+cols = get_samp_cols(pond@data$YSB_00, col_temp)
+grps = as.character(sort(unique(cols$grps)))
+plot(fire_ll, border='grey')
+points(pond, pch=1)
+points(pond, pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
+cols = get_samp_cols(pond@data$YSB_17, col_temp)
+grps = as.character(sort(unique(cols$grps)))
+plot(fire_ll, border='grey')
+points(pond, pch=1)
+points(pond, pch=19, col=cols$col)
+legend('bottomright', grps, col = cols$col[match(grps, cols$grps)], 
+       pch=19, bty='n')
+dev.off()
+
+
+
 plots16sp = read_excel('./data/Project016.xlsx', sheet = 'plot species list')
 sr = with(plots16sp, tapply(currentTaxonName, authorObsCode, function(x) length(unique(x))))
 plot(density(sr))
@@ -82,11 +159,6 @@ points(vegplots[grep('Pinus palustris', vegplots$commPrimaryScientific), ],
 points(vegplots[vegplots$project_num == 16, ], col='blue')
 
 
-tst = sapply(fire, function(x) over(x, vegplots))
-plt_burns = sapply(1:nrow(vegplots), function(x)
-                   over(vegplots[x, ], fire)$)
-
-
 plt_burns = sapply(1:nrow(fire), function(x) 
                    over(fire[x, ], vegplots)$Plot.Code)
 table(plt_burns)
@@ -114,6 +186,7 @@ vegplots$ff_pre = ff_pre
 vegplots$ff_post = ff_post                                
 
 llvegplots = vegplots[grep('Pinus palustris', vegplots$commPrimaryScientific), ]
+llvegplots = spTransform(llvegplots, geo_prj)
 llvegplots$nburns = sapply(yrs_since_burn[grep('Pinus palustris',
                                                vegplots$commPrimaryScientific)],
                            length)
@@ -121,10 +194,11 @@ llvegplots$nburns = sapply(yrs_since_burn[grep('Pinus palustris',
 inbounds = ifelse(is.na(over(llvegplots, fire_ll)[,1]), F, T)
 
 col_temp = rev(terrain.colors(5))[-1]
-cols = get_samp_cols(llvegplots$ff_pre[inbounds], col_temp)
-grps = as.character(sort(unique(cols$grps)))
 
 pdf('./figs/pre_post_fire_freq_llvegplots.pdf', width=7*2, height=7)
+par(mfrow=c(1,1))
+cols = get_samp_cols(llvegplots$ff_pre[inbounds], col_temp)
+grps = as.character(sort(unique(cols$grps)))
 plot(fire_ll, border='grey')
 points(llvegplots, pch=1)
 points(llvegplots[inbounds, ], pch=19, col=cols$col)
@@ -142,6 +216,8 @@ dev.off()
 
 ## project 16 only
 pdf('./figs/pre_post_fire_freq_llvegplots_Proj16.pdf', width=7*2, height=7)
+cols = get_samp_cols(llvegplots$ff_pre[inbounds], col_temp)
+grps = as.character(sort(unique(cols$grps)))
 plot(fire_ll, border='grey')
 points(llvegplots, pch=1)
 points(llvegplots[inbounds, ], pch=19, col=cols$col)
@@ -160,8 +236,8 @@ dev.off()
 table(llvegplots$year)
 
 ## extract fire history for llvegplots
-llburn = spTransform(burn, CRS(proj4string(llvegplots)))
-vegburns = over(llvegplots, llburn, returnList=TRUE)
+#llburn = spTransform(burn, CRS(proj4string(llvegplots)))
+vegburns = over(llvegplots, fire_ll, returnList=TRUE)
 
 lastburn = unlist(lapply(vegburns, function(x) as.character(max(x$BurnDate))))
 nburn = unlist(lapply(vegburns, function(x) length(x$BurnDate)))
