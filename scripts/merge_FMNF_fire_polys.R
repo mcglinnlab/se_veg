@@ -6,7 +6,7 @@ library(rgeos)
 fire_Rx = readOGR('./gis/poly/FM_RxBurnHistory.shp', layer='FM_RxBurnHistory')
 #clean up subunit id field called FACTS_S
 fire_Rx$FACTS_S = as.character(fire_Rx$FACTS_S)
-true = nchar(fire_Rx$FACTS_S) > 19
+true = ifelse(is.na(fire_Rx$FACTS_S), FALSE, nchar(fire_Rx$FACTS_S) > 19)
 fire_Rx$FACTS_S[true] = substring(fire_Rx$FACTS_S[true], 1, 19)
 
 fire_haz = readOGR('./gis/poly/S_USA.Activity_HazFuelTrt_PL.shp', layer='S_USA.Activity_HazFuelTrt_PL')
