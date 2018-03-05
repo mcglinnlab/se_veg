@@ -18,6 +18,11 @@ invasive = readOGR('./gis/poly/Current_Invasive_Plants_Inventory.shp',
 
 topo = stack('./gis/raster/1944 Cordesville Topographic Map.img')
 
+silv = readOGR('./gis/poly/Silviculture_Reforestation.shp', 
+               layer='Silviculture_Reforestation')
+timb = readOGR('./gis/poly/Silviculture_Timber_Stand_Improvement.shp',
+               layer='Silviculture_Timber_Stand_Improvement')
+
 fire_modis = raster('./gis/ModisData/nburns.grd')
 fire_occ = readOGR('./gis/poly/Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations.shp', 
                    layer='Monitoring_Trends_in_Burn_Severity__Fire_Occurrence_Locations')
@@ -37,14 +42,21 @@ Owners_ll = spTransform(Owners, geo_prj)
 topo_ll = spTransform(topo, geo_prj)
 soil_ll = spTransform(soil, geo_prj)
 fire_ll = spTransform(fire, geo_prj)
+roads_ll = spTransform(roads, geo_prj)
 
 pond = read.csv('./data/pond_treatments.csv')
 pond = SpatialPointsDataFrame(coords = pond[ , c('LONGITUDE', 'LATITUDE')],
                               data = pond)
 proj4string(pond) = geo_prj
 
-plot(fire_ll, border='grey')
-points(pond, col='red')
+pdf('./figs/pond_map.pdf')
+plot(roads_ll, xlim=c(-79.75, -79.5), ylim=c(32.8, 33.28),
+     col='grey')
+points(pond, col='red', pch=19)
+text(coordinates(pond)[ , 1], coordinates(pond)[ , 2] + 0.01,
+     labels=pond@data$COMPARTMEN, col='red')
+dev.off()
+
 
 pond_burns = sapply(1:nrow(fire_ll), function(x) 
                     over(fire_ll[x, ], pond)$COMPARTMEN)
@@ -69,6 +81,7 @@ pond_fire_data = data.frame(COMPARTMEN = names(ff_91_00),
                             ff_91_00, ff_00_17, ff_last_8yr,
                             YSB_00, YSB_17)
 pond@data = merge(pond@data, pond_fire_data)
+writeOGR(pond, "./gis/kml/ponds.kml", "Ponds", "KML")
 write.csv(pond@data, file='./data/pond_fire_extracted.csv',
           row.names=F)
 
